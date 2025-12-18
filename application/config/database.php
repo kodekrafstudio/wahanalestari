@@ -95,24 +95,3 @@ $db['default'] = array(
 	'save_queries' => TRUE
 );
 
-$db['hosting'] = array(
-	'dsn'	=> '',
-	'hostname' => 'localhost',
-	'username' => 'u660596710_posiwl',
-	'password' => 'Wahanalestari123!@#',
-	'database' => 'u660596710_posiwl',
-	'dbdriver' => 'mysqli',
-	'dbprefix' => '',
-	'pconnect' => FALSE,
-	'db_debug' => (ENVIRONMENT !== 'production'),
-	'cache_on' => FALSE,
-	'cachedir' => '',
-	'char_set' => 'utf8',
-	'dbcollat' => 'utf8_general_ci',
-	'swap_pre' => '',
-	'encrypt' => FALSE,
-	'compress' => FALSE,
-	'stricton' => FALSE,
-	'failover' => array(),
-	'save_queries' => TRUE
-);
