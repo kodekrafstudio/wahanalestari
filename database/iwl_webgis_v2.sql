@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 18 Des 2025 pada 04.32
+-- Waktu pembuatan: 18 Des 2025 pada 18.18
 -- Versi server: 10.4.11-MariaDB
 -- Versi PHP: 7.2.29
 
@@ -60,6 +60,27 @@ INSERT INTO `business_categories` (`category_id`, `category_name`, `description`
 (5, 'Pertanian dan Peternakan', 'Pertanian dan Peternakan'),
 (6, 'Retail', 'Retail'),
 (7, 'Industri Detergen\r\n', 'Industri Sabun Pertanian dan Peternakan');
+
+-- --------------------------------------------------------
+
+--
+-- Struktur dari tabel `company_capital`
+--
+
+CREATE TABLE `company_capital` (
+  `id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `description` varchar(255) NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `type` enum('capital_in','prive') DEFAULT 'capital_in'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+--
+-- Dumping data untuk tabel `company_capital`
+--
+
+INSERT INTO `company_capital` (`id`, `date`, `description`, `amount`, `type`) VALUES
+(1, '2025-12-01', 'Dana Masuk', '20000000.00', 'capital_in');
 
 -- --------------------------------------------------------
 
@@ -186,6 +207,7 @@ CREATE TABLE `delivery_routes` (
 CREATE TABLE `delivery_route_points` (
   `point_id` int(11) NOT NULL,
   `route_id` int(11) DEFAULT NULL,
+  `sales_order_id` int(11) DEFAULT NULL,
   `customer_id` int(11) DEFAULT NULL,
   `sequence_number` int(11) DEFAULT NULL,
   `arrival_time` timestamp NULL DEFAULT NULL,
@@ -197,11 +219,38 @@ CREATE TABLE `delivery_route_points` (
 -- --------------------------------------------------------
 
 --
+-- Struktur dari tabel `expense_categories`
+--
+
+CREATE TABLE `expense_categories` (
+  `category_id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `type` enum('fixed','variable') DEFAULT 'fixed'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+--
+-- Dumping data untuk tabel `expense_categories`
+--
+
+INSERT INTO `expense_categories` (`category_id`, `name`, `type`) VALUES
+(1, 'Gaji & Tunjangan', 'fixed'),
+(2, 'Listrik, Air & Internet', 'fixed'),
+(3, 'Sewa Kantor/Gudang', 'fixed'),
+(4, 'Pemasaran & Iklan', 'variable'),
+(5, 'Transportasi & Bensin', 'variable'),
+(6, 'Perawatan Aset', 'variable'),
+(7, 'ATK & Perlengkapan', 'variable'),
+(8, 'Biaya Lain-lain', 'variable');
+
+-- --------------------------------------------------------
+
+--
 -- Struktur dari tabel `operational_expenses`
 --
 
 CREATE TABLE `operational_expenses` (
   `expense_id` int(11) NOT NULL,
+  `category_id` int(11) DEFAULT NULL,
   `expense_date` date DEFAULT NULL,
   `category` varchar(100) DEFAULT NULL,
   `description` text DEFAULT NULL,
@@ -295,6 +344,7 @@ CREATE TABLE `sales_orders` (
   `grand_total` decimal(15,2) DEFAULT 0.00,
   `total_paid` decimal(15,2) DEFAULT 0.00,
   `status` enum('request','preparing','delivering','done','canceled') DEFAULT 'request',
+  `note` text DEFAULT NULL,
   `payment_status` enum('unpaid','partial','paid') DEFAULT 'unpaid',
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -345,10 +395,10 @@ CREATE TABLE `salt_products` (
   `type` enum('konsumsi','industri','artisan','bath_salt') DEFAULT NULL,
   `grade` varchar(100) DEFAULT NULL,
   `unit` varchar(20) DEFAULT NULL,
-  `last_purchase_price` decimal(15,2) DEFAULT 0.00,
-  `base_cost` decimal(10,2) DEFAULT NULL,
-  `price` decimal(15,2) DEFAULT 0.00,
-  `sell_price` decimal(10,2) DEFAULT NULL
+  `last_purchase_price` varchar(20) DEFAULT NULL,
+  `base_cost` varchar(20) DEFAULT NULL,
+  `price` varchar(20) DEFAULT NULL,
+  `sell_price` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
@@ -356,14 +406,14 @@ CREATE TABLE `salt_products` (
 --
 
 INSERT INTO `salt_products` (`product_id`, `name`, `type`, `grade`, `unit`, `last_purchase_price`, `base_cost`, `price`, `sell_price`) VALUES
-(1, 'Garam Industri Krosok Premium', 'industri', 'Premium', 'kg', '2700.00', '2700.00', '0.00', '3800.00'),
-(2, 'Garam Industri Krosok K1', 'industri', 'Medium', 'kg', '2400.00', '2400.00', '0.00', '3500.00'),
-(3, 'Garam Industri Halus - PT. Garam', 'industri', 'Premium', 'kg', '0.00', '4500.00', '0.00', '5800.00'),
-(5, 'Garam Industri Halus - Washing Unicham ', 'industri', 'Premium', 'kg', '0.00', '6000.00', '0.00', '7000.00'),
-(6, 'Garam Konsumsi Cap Anak Sehat @250gr', 'konsumsi', 'Premium', 'pack', '0.00', '35000.00', '0.00', '37500.00'),
-(7, 'Garam Konsumsi Cap Segitiga @250gr', 'konsumsi', 'Premium', 'pack', '0.00', '35000.00', '0.00', '38000.00'),
-(8, 'Garam Krosok – Premium 1kg', 'industri', 'Premium', 'pack', '0.00', '3200.00', '0.00', '4000.00'),
-(9, 'Garam Konsumsi - Bata GM 1kg', 'konsumsi', 'Premium', 'pack', '0.00', '5500.00', '0.00', '7000.00');
+(1, 'Garam Industri Krosok Premium', 'industri', 'Premium', 'kg', '2700.00', '2700', '0', '3800'),
+(2, 'Garam Industri Krosok K1', 'industri', 'Medium', 'kg', '2400.00', '2400', '0', '3500'),
+(3, 'Garam Industri Halus - PT. Garam', 'industri', 'Premium', 'kg', '0', '4500', '0', '5800'),
+(5, 'Garam Industri Halus - Washing Unicham ', 'industri', 'Premium', 'kg', '0', '6000', '0', '7000'),
+(6, 'Garam Konsumsi Cap Anak Sehat @250gr', 'konsumsi', 'Premium', 'pack', '0', '35000', '0', '37500'),
+(7, 'Garam Konsumsi Cap Segitiga @250gr', 'konsumsi', 'Premium', 'pack', '0', '35000', '0', '38000'),
+(8, 'Garam Krosok – Premium 1kg', 'industri', 'Premium', 'pack', '0', '3200', '0', '4000'),
+(9, 'Garam Konsumsi - Bata GM 1kg', 'konsumsi', 'Premium', 'pack', '0', '6000', '0', '7000');
 
 -- --------------------------------------------------------
 
@@ -466,6 +516,12 @@ ALTER TABLE `business_categories`
   ADD PRIMARY KEY (`category_id`);
 
 --
+-- Indeks untuk tabel `company_capital`
+--
+ALTER TABLE `company_capital`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indeks untuk tabel `customers`
 --
 ALTER TABLE `customers`
@@ -518,6 +574,12 @@ ALTER TABLE `delivery_route_points`
   ADD PRIMARY KEY (`point_id`),
   ADD KEY `route_id` (`route_id`),
   ADD KEY `customer_id` (`customer_id`);
+
+--
+-- Indeks untuk tabel `expense_categories`
+--
+ALTER TABLE `expense_categories`
+  ADD PRIMARY KEY (`category_id`);
 
 --
 -- Indeks untuk tabel `operational_expenses`
@@ -626,6 +688,12 @@ ALTER TABLE `business_categories`
   MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
+-- AUTO_INCREMENT untuk tabel `company_capital`
+--
+ALTER TABLE `company_capital`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT untuk tabel `customers`
 --
 ALTER TABLE `customers`
@@ -668,10 +736,16 @@ ALTER TABLE `delivery_route_points`
   MODIFY `point_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT untuk tabel `expense_categories`
+--
+ALTER TABLE `expense_categories`
+  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+
+--
 -- AUTO_INCREMENT untuk tabel `operational_expenses`
 --
 ALTER TABLE `operational_expenses`
-  MODIFY `expense_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `expense_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT untuk tabel `purchases`
