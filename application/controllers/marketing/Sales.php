@@ -159,6 +159,12 @@ class Sales extends CI_Controller {
             redirect('marketing/sales/detail/' . $order_id);
         }
 
+        if ($sisa < $item->qty) {
+            // Error handling yang bagus!
+            $this->session->set_flashdata('error', "GAGAL KIRIM! Stok {$item->product_name} tidak cukup...");
+            return; 
+        }
+
         // ------------------------------------------------------------------
         // SKENARIO 1: BARANG KELUAR (Potong Stok)
         // Terjadi saat status berubah dari (Request/Preparing) --> MENJADI --> Delivering

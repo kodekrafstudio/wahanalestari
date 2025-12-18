@@ -3,6 +3,12 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Sales_model extends CI_Model {
 
+    public function __construct() {
+        parent::__construct();
+        // Load di sini sekali saja agar bisa dipakai semua fungsi
+        $this->load->model('Inventory_model'); 
+    }
+    
     // 1. GENERATE NOMOR FAKTUR
     public function generate_invoice_no() {
         $month = date('m');
