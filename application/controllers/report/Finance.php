@@ -11,39 +11,32 @@ class Finance extends CI_Controller {
         $this->load->library('template');
     }
 
-    // HALAMAN UTAMA LAPORAN
     public function index() {
         $data['title'] = 'Laporan Keuangan Profesional';
         
         $month = $this->input->get('month') ? $this->input->get('month') : date('m');
         $year  = $this->input->get('year')  ? $this->input->get('year')  : date('Y');
 
-        // Laba Rugi (Kinerja Periode Ini)
+        // Menggunakan method baru dari Report_model yang sudah diupdate
         $data['pl'] = $this->Report_model->get_profit_loss($month, $year);
+        $data['bs'] = $this->Report_model->get_balance_sheet();
         
-        // Neraca (Posisi Keuangan SAAT INI / Akumulasi)
-        $data['bs'] = $this->Report_model->get_balance_sheet(); 
-        
-        // Ratio Keuangan untuk Investor (PENTING!)
-        // Net Profit Margin = (Laba Bersih / Omzet) * 100
-        $omzet = $data['pl']['revenue'];
-        $data['net_margin'] = ($omzet > 0) ? ($data['pl']['net_profit'] / $omzet) * 100 : 0;
-
         $data['filter'] = ['month' => $month, 'year' => $year];
 
-        $this->template->load('report/finance/index', $data);
+        // Pastikan path view sesuai dengan nama folder Anda (report atau reports)
+        $this->template->load('reports/finance/index', $data);
     }
     
-    // CETAK LAPORAN (Print View)
-    public function print_report() {
-        $month = $this->input->get('month');
-        $year  = $this->input->get('year');
+    // FUNGSI BARU: CETAK FORMAT BANK
+    public function print_bank_standard() {
+        $month = $this->input->get('month') ? $this->input->get('month') : date('m');
+        $year  = $this->input->get('year')  ? $this->input->get('year')  : date('Y');
         
-        $data['pl']           = $this->Report_model->get_profit_loss($month, $year);
-        $data['top_products'] = $this->Report_model->get_top_products($month, $year);
-        $data['expenses']     = $this->Report_model->get_expenses_detail($month, $year);
-        $data['period']       = date("F Y", mktime(0, 0, 0, $month, 10));
+        $data['pl'] = $this->Report_model->get_profit_loss($month, $year);
+        $data['bs'] = $this->Report_model->get_balance_sheet();
+        $data['filter'] = ['month' => $month, 'year' => $year];
 
-        $this->load->view('report/finance/print', $data);
+        // Load view khusus print (tanpa template dashboard)
+        $this->load->view('reports/finance/print_bank_standard', $data);
     }
 }

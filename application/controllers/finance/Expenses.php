@@ -14,27 +14,28 @@ class Expenses extends CI_Controller {
 
     public function index() {
         $data['title'] = 'Biaya Operasional';
-
-        // Filter Tanggal (Default: Bulan Ini)
         $start = $this->input->get('start') ? $this->input->get('start') : date('Y-m-01');
         $end   = $this->input->get('end') ? $this->input->get('end') : date('Y-m-d');
 
         $data['expenses'] = $this->Expense_model->get_all($start, $end);
         $data['total']    = $this->Expense_model->get_total_expenses($start, $end);
-        
-        // Kirim filter balik ke view
-        $data['filter'] = ['start' => $start, 'end' => $end];
+        $data['filter']   = ['start' => $start, 'end' => $end];
 
         $this->template->load('finance/expenses/index', $data);
     }
 
+    // UPDATE FUNGSI INI
     public function create() {
         if ($this->input->post()) {
             $data = [
                 'expense_date' => $this->input->post('expense_date'),
-                'category'     => $this->input->post('category'),
+                
+                // Simpan ID Kategori & Nama Kategori (untuk backup)
+                'category_id'  => $this->input->post('category_id'),
+                'category'     => $this->input->post('category_name'), 
+                
                 'description'  => $this->input->post('description'),
-                'amount'       => $this->input->post('amount'),
+                'amount'       => str_replace(['Rp','.',' '], '', $this->input->post('amount')),
                 'created_by'   => $this->session->userdata('user_id')
             ];
 
@@ -45,17 +46,10 @@ class Expenses extends CI_Controller {
         }
 
         $data['title'] = 'Catat Pengeluaran Baru';
-        // Daftar Kategori (Bisa ditambah manual disini)
-        $data['categories'] = [
-            'Gaji & Upah', 
-            'Listrik & Air', 
-            'Transportasi/Bensin', 
-            'Sewa Tempat', 
-            'Perawatan Kendaraan', 
-            'Konsumsi', 
-            'Promosi/Iklan',
-            'Lain-lain'
-        ];
+        
+        // Ambil data kategori dari database
+        // Pastikan tabel expense_categories sudah dibuat di SQL sebelumnya
+        $data['categories'] = $this->db->get('expense_categories')->result();
         
         $this->template->load('finance/expenses/create', $data);
     }

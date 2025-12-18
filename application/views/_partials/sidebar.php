@@ -140,7 +140,7 @@
         <li class="nav-header">KEUANGAN</li>
         <li class="nav-item">
             <a href="<?= site_url('finance/expenses') ?>" class="nav-link">
-                <i class="nav-icon fas fa-wallet"></i>
+                <i class="fas fa-money-bill-wave nav-icon"></i>
                 <p>Biaya Operasional</p>
             </a>
         </li>
@@ -165,13 +165,8 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="<?= site_url('reports/profit_loss') ?>" class="nav-link">
-                        <i class="far fa-circle nav-icon"></i> <p>Laba Rugi (P&L)</p>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="<?= site_url('reports/neraca') ?>" class="nav-link">
-                        <i class="far fa-circle nav-icon"></i> <p>Neraca</p>
+                    <a href="<?= site_url('report/finance') ?>" class="nav-link">
+                        <i class="far fa-circle nav-icon"></i> <p>Laporan Keuangan</p>
                     </a>
                 </li>
             </ul>
@@ -186,6 +181,11 @@
                 <p>Master Data <i class="fas fa-angle-left right"></i></p>
             </a>
             <ul class="nav nav-treeview">
+                <li class="nav-item">
+                    <a href="<?= site_url('finance/settings') ?>" class="nav-link">
+                        <i class="far fa-circle nav-icon"></i> <p>Setup Keuangan</p>
+                    </a>
+                </li>
                 <li class="nav-item">
                     <a href="<?= site_url('master/products') ?>" class="nav-link">
                         <i class="far fa-circle nav-icon"></i> <p>Produk & Harga</p>

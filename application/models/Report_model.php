@@ -3,14 +3,12 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Report_model extends CI_Model {
 
-    // =========================================================================
-    // 1. LAPORAN PENJUALAN (SALES REPORT)
-    // =========================================================================
+    // 1. LAPORAN PENJUALAN (SALES) - AMAN
     public function get_sales_report($start_date, $end_date, $status = 'all') {
         $this->db->select('so.*, c.name as customer_name, u.full_name as sales_name');
         $this->db->from('sales_orders so');
         $this->db->join('customers c', 'c.customer_id = so.customer_id', 'left');
-        $this->db->join('users u', 'u.user_id = so.created_by', 'left'); // Atau salesman_id
+        $this->db->join('users u', 'u.user_id = so.created_by', 'left');
         
         $this->db->where('DATE(so.order_date) >=', $start_date);
         $this->db->where('DATE(so.order_date) <=', $end_date);
@@ -23,9 +21,7 @@ class Report_model extends CI_Model {
         return $this->db->get()->result();
     }
 
-    // =========================================================================
-    // 2. LAPORAN MUTASI STOK (STOCK MOVEMENT)
-    // =========================================================================
+    // 2. LAPORAN MUTASI STOK (STOCK) - AMAN
     public function get_stock_report($start_date, $end_date, $product_id = 'all') {
         $this->db->select('sl.*, p.name as product_name, p.unit, u.full_name as user_name');
         $this->db->from('stock_logs sl');
@@ -43,23 +39,18 @@ class Report_model extends CI_Model {
         return $this->db->get()->result();
     }
 
-    // =========================================================================
-    // 3. LABA RUGI (PROFIT & LOSS)
-    // =========================================================================
+    // 3. LABA RUGI (PROFIT & LOSS) - PERBAIKAN GROUP BY
     public function get_profit_loss($month, $year) {
         
-        // A. PENDAPATAN (REVENUE)
-        // Dari Sales Order yang valid (tidak cancel)
-        $this->db->select_sum('grand_total'); // Pastikan nama kolom 'grand_total'
+        // A. PENDAPATAN
+        $this->db->select_sum('grand_total');
         $this->db->where('MONTH(order_date)', $month);
         $this->db->where('YEAR(order_date)', $year);
         $this->db->where('status !=', 'canceled');
         $query_rev = $this->db->get('sales_orders')->row();
         $revenue = $query_rev ? $query_rev->grand_total : 0;
 
-        // B. HPP (COST OF GOODS SOLD)
-        // Dari Sales Items (Qty * Cost Historis)
-        // Gunakan FALSE agar tidak error backticks pada rumus perkalian
+        // B. HPP (COGS)
         $this->db->select('SUM(soi.qty * soi.cost) as total_hpp', FALSE);
         $this->db->from('sales_order_items soi');
         $this->db->join('sales_orders so', 'so.id = soi.sales_order_id');
@@ -70,19 +61,22 @@ class Report_model extends CI_Model {
         $hpp = $query_hpp ? $query_hpp->total_hpp : 0;
 
         // C. BIAYA OPERASIONAL (EXPENSES)
-        $this->db->select_sum('amount');
-        $this->db->where('MONTH(expense_date)', $month);
-        $this->db->where('YEAR(expense_date)', $year);
-        $query_exp = $this->db->get('operational_expenses')->row();
-        $expenses = $query_exp ? $query_exp->amount : 0;
+        // Menggunakan tabel operational_expenses (sesuai database Anda)
+        $this->db->select('ec.name as category, SUM(e.amount) as total');
+        $this->db->from('operational_expenses e');
+        $this->db->join('expense_categories ec', 'ec.category_id = e.category_id', 'left'); 
+        $this->db->where('MONTH(e.expense_date)', $month);
+        $this->db->where('YEAR(e.expense_date)', $year);
+        
+        // FIX: Group By harus konsisten
+        $this->db->group_by('e.category_id, ec.name, e.category'); 
+        $expense_list = $this->db->get()->result();
 
-        // D. DETAIL LIST BIAYA (Untuk Tabel)
-        $this->db->where('MONTH(expense_date)', $month);
-        $this->db->where('YEAR(expense_date)', $year);
-        $this->db->order_by('expense_date', 'ASC');
-        $expense_list = $this->db->get('operational_expenses')->result();
+        $total_expense = 0;
+        foreach($expense_list as $e) { $total_expense += $e->total; }
 
-        // E. PRODUK TERLARIS (Top 5)
+        // D. PRODUK TERLARIS (Top 5)
+        // FIX: Group By p.name ditambahkan agar tidak error di MySQL modern
         $this->db->select('p.name, SUM(soi.qty) as total_qty, SUM(soi.subtotal) as total_sales');
         $this->db->from('sales_order_items soi');
         $this->db->join('sales_orders so', 'so.id = soi.sales_order_id');
@@ -90,92 +84,91 @@ class Report_model extends CI_Model {
         $this->db->where('MONTH(so.order_date)', $month);
         $this->db->where('YEAR(so.order_date)', $year);
         $this->db->where('so.status !=', 'canceled');
-        $this->db->group_by('soi.product_id');
+        $this->db->group_by('soi.product_id, p.name'); 
         $this->db->order_by('total_qty', 'DESC');
         $this->db->limit(5);
         $top_products = $this->db->get()->result();
 
+        // Hitung Profit & Margin
+        $gross_profit = $revenue - $hpp;
+        $net_profit   = $gross_profit - $total_expense;
+        $gross_margin = ($revenue > 0) ? ($gross_profit / $revenue) * 100 : 0;
+        $net_margin   = ($revenue > 0) ? ($net_profit / $revenue) * 100 : 0;
+
         return [
-            'revenue'      => (float) $revenue,
-            'hpp'          => (float) $hpp,
-            'expenses'     => (float) $expenses,
-            'expense_list' => $expense_list,
-            'top_products' => $top_products
+            'revenue'       => (float) $revenue,
+            'cogs'          => (float) $hpp,
+            'gross_profit'  => (float) $gross_profit,
+            'expenses_list' => $expense_list,
+            'total_expense' => (float) $total_expense,
+            'net_profit'    => (float) $net_profit,
+            'top_products'  => $top_products,
+            'gross_margin'  => $gross_margin,
+            'net_margin'    => $net_margin
         ];
     }
 
-    // =========================================================================
-    // 4. NERACA KEUANGAN (BALANCE SHEET) - FIX COLUMN NAME
-    // =========================================================================
+    // 4. NERACA (BALANCE SHEET) - PERBAIKAN KOLOM
     public function get_balance_sheet() {
         
-        // --- A. ASET (ASSETS) ---
+        // --- A. ASSETS (HARTA) ---
         
-        // 1. Persediaan (Inventory Value)
-        $this->db->select('SUM(ws.quantity * p.base_cost) as inventory_value', FALSE);
-        $this->db->from('warehouse_stock ws');
-        $this->db->join('salt_products p', 'p.product_id = ws.product_id');
-        $q_inv = $this->db->get()->row();
-        $inventory = $q_inv ? $q_inv->inventory_value : 0;
+        // 1. Kas (Estimasi)
+        $modal_awal = $this->db->select_sum('amount')->get('company_capital')->row();
+        $val_modal  = $modal_awal ? $modal_awal->amount : 0;
 
-        // 2. Piutang (Receivables) - Dari Penjualan (Tabel sales_orders pakai grand_total)
-        $this->db->select('SUM(grand_total - total_paid) as receivables', FALSE);
-        $this->db->where('status !=', 'canceled');
-        $this->db->where('payment_status !=', 'paid');
-        $q_piutang = $this->db->get('sales_orders')->row();
-        $piutang = $q_piutang ? $q_piutang->receivables : 0;
-
-        // 3. Estimasi Kas (Cash on Hand)
-        // Uang Masuk dari Penjualan
-        $this->db->select_sum('total_paid');
-        $q_in = $this->db->get('sales_orders')->row();
-        $cash_in = $q_in ? $q_in->total_paid : 0;
-
-        // Uang Keluar untuk Pembelian (Cek tabel purchases)
-        $cash_out_buy = 0;
-        // Kita cek manual apakah kolom total_paid ada
-        if($this->db->field_exists('total_paid', 'purchases')) {
-            $this->db->select_sum('total_paid');
-            $q_out_buy = $this->db->get('purchases')->row();
-            $cash_out_buy = $q_out_buy ? $q_out_buy->total_paid : 0;
-        }
-
-        // Uang Keluar untuk Operasional
-        $this->db->select_sum('amount');
-        $q_out_exp = $this->db->get('operational_expenses')->row();
-        $cash_out_exp = $q_out_exp ? $q_out_exp->amount : 0;
-
-        $cash_balance = $cash_in - ($cash_out_buy + $cash_out_exp);
-
-
-        // --- B. KEWAJIBAN (LIABILITIES) ---
-
-        // 1. Hutang Usaha (Payables) - Dari Pembelian
-        // PERBAIKAN: Menggunakan 'total_amount' bukan 'grand_total'
-        $hutang = 0;
+        $sales_paid = $this->db->select_sum('total_paid')->get('sales_orders')->row();
+        $val_sales  = $sales_paid ? $sales_paid->total_paid : 0;
         
-        // Pastikan kolom total_paid sudah dibuat di database
-        if($this->db->field_exists('total_paid', 'purchases')) {
-            // Rumus: Total Tagihan (total_amount) - Sudah Dibayar (total_paid)
-            $this->db->select('SUM(total_amount - total_paid) as payables', FALSE);
-            $this->db->where('status !=', 'canceled');
-            $q_hutang = $this->db->get('purchases')->row();
-            $hutang = $q_hutang ? $q_hutang->payables : 0;
-        }
+        // FIX: Menggunakan kolom 'total_paid' dari tabel purchases (jika ada)
+        // Jika belum ada kolom total_paid di purchases, jalankan SQL ALTER TABLE dulu.
+        // Asumsi: sudah ada sesuai file sql.
+        $purch_paid = $this->db->select_sum('total_paid')->get('purchases')->row();
+        $val_purch  = $purch_paid ? $purch_paid->total_paid : 0;
+        
+        $exp_total  = $this->db->select_sum('amount')->get('operational_expenses')->row();
+        $val_exp    = $exp_total ? $exp_total->amount : 0;
 
-        // --- C. EKUITAS (EQUITY) ---
-        // Equity = Assets - Liabilities
-        $total_assets      = $cash_balance + $inventory + $piutang;
-        $total_liabilities = $hutang;
-        $equity            = $total_assets - $total_liabilities;
+        $cash_on_hand = ($val_modal + $val_sales) - ($val_purch + $val_exp);
+
+        // 2. Persediaan (Stok * HPP)
+        $query_stock = $this->db->query("SELECT SUM(quantity * base_cost) as val FROM warehouse_stock ws JOIN salt_products p ON p.product_id = ws.product_id")->row();
+        $inventory_value = $query_stock ? $query_stock->val : 0;
+
+        // 3. Piutang (Sales - Paid)
+        $query_ar = $this->db->query("SELECT SUM(grand_total - total_paid) as piutang FROM sales_orders WHERE payment_status != 'paid' AND status != 'canceled'")->row();
+        $piutang = $query_ar ? $query_ar->piutang : 0;
+
+        $total_assets = $cash_on_hand + $inventory_value + $piutang;
+
+        // --- B. LIABILITIES (HUTANG) ---
+        
+        // 1. Hutang Dagang (Purchase - Paid)
+        // FIX ERROR DISINI: Menggunakan 'total_cost' (bukan total_amount)
+        $query_ap = $this->db->query("SELECT SUM(total_cost - total_paid) as hutang FROM purchases WHERE payment_status != 'paid' AND status != 'canceled'")->row();
+        $hutang = $query_ap ? $query_ap->hutang : 0;
+
+        // --- C. EQUITY (MODAL) ---
+        
+        $total_equity_paid = $val_modal;
+        $retained_earnings = $total_assets - $hutang - $total_equity_paid;
 
         return [
-            'cash'         => (float) $cash_balance,
-            'inventory'    => (float) $inventory,
-            'receivables'  => (float) $piutang,
-            'payables'     => (float) $hutang,
-            'equity'       => (float) $equity,
-            'total_assets' => (float) $total_assets
+            'assets' => [
+                'cash'      => (float) $cash_on_hand,
+                'inventory' => (float) $inventory_value,
+                'piutang'   => (float) $piutang,
+                'total'     => (float) $total_assets
+            ],
+            'liabilities' => [
+                'hutang_dagang' => (float) $hutang,
+                'total'         => (float) $hutang
+            ],
+            'equity' => [
+                'modal_disetor' => (float) $total_equity_paid,
+                'laba_ditahan'  => (float) $retained_earnings,
+                'total'         => (float) ($total_equity_paid + $retained_earnings)
+            ]
         ];
     }
 }

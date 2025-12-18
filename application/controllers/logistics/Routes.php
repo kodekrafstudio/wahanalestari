@@ -6,119 +6,93 @@ class Routes extends CI_Controller {
     public function __construct() {
         parent::__construct();
         if (!$this->session->userdata('user_id')) { redirect('auth/login'); }
-
-        $role = $this->session->userdata('role');
-        // Hanya Admin dan Owner yang boleh masuk
-        if ($role != 'admin' && $role != 'owner' && $role != 'driver') {
-            show_error('Anda tidak memiliki hak akses untuk halaman ini.', 403, 'Forbidden');
-        }
-        
-        
         $this->load->model('Delivery_model');
-        $this->load->model('User_model'); // Untuk list driver
-        $this->load->model('Customer_model'); // Untuk list toko
         $this->load->library('template');
-        $this->load->library('form_validation');
     }
 
     public function index() {
-        $data['title'] = 'Jadwal Pengiriman';
+        $data['title'] = 'Manajemen Rute Pengiriman';
         $data['routes'] = $this->Delivery_model->get_all_routes();
         $this->template->load('logistics/routes/index', $data);
     }
 
-    // Langkah 1: Buat Header Rute (Siapa Driver & Mobilnya)
     public function create() {
-        $this->form_validation->set_rules('driver_id', 'Driver', 'required');
-        $this->form_validation->set_rules('vehicle', 'Kendaraan', 'required');
-        $this->form_validation->set_rules('route_date', 'Tanggal', 'required');
-
-        if ($this->form_validation->run() == FALSE) {
-            $data['title'] = 'Buat Rute Baru';
-            // Ambil user yang role-nya driver (Asumsi di DB ada role 'driver')
-            $data['drivers'] = $this->db->get_where('users', ['role' => 'driver'])->result();
-            $this->template->load('logistics/routes/create', $data);
-        } else {
+        if ($this->input->post()) {
             $data = [
-                'driver_id' => $this->input->post('driver_id'),
-                'vehicle'   => $this->input->post('vehicle'),
-                'route_date'=> $this->input->post('route_date'),
-                'status'    => 'planned'
+                'driver_id'  => $this->input->post('driver_id'),
+                'vehicle'    => $this->input->post('vehicle'),
+                'route_date' => $this->input->post('route_date'),
+                'status'     => 'planned'
             ];
-            $route_id = $this->Delivery_model->create_route($data);
-            redirect('logistics/routes/view/' . $route_id);
+            $id = $this->Delivery_model->insert_route($data);
+            redirect('logistics/routes/view/'.$id);
         }
+        
+        // Ambil data driver (User dengan role driver)
+        $data['drivers'] = $this->db->get_where('users', ['role' => 'driver'])->result();
+        $this->template->load('logistics/routes/create', $data);
     }
 
-    // Saat membuka halaman Detail Rute (view)
     public function view($id) {
-        // ... kode lama ...
+        $data['route'] = $this->Delivery_model->get_route_detail($id);
+        if(!$data['route']) show_404();
+
+        $data['title'] = 'Detail Rute: ' . $data['route']->driver_name;
         
-        // GANTI INI: Jangan ambil semua customer
-        // $data['customers'] = $this->Customer_model->get_all(); 
-        
-        // JADI INI: Ambil hanya Sales Order yang statusnya 'delivering' tapi belum punya Rute
-        // (Asumsi Anda menambah kolom 'route_id' di tabel sales_orders atau mapping manual)
-        $data['pending_orders'] = $this->db->query("
-            SELECT so.id, so.invoice_no, c.name, c.address 
-            FROM sales_orders so
-            JOIN customers c ON c.customer_id = so.customer_id
-            WHERE so.status = 'request' OR so.status = 'preparing'
-        ")->result();
-        
+        // UPDATE: Ambil Pending Orders (Invoice) bukannya Customers biasa
+        $data['pending_orders'] = $this->Delivery_model->get_pending_orders();
+
         $this->template->load('logistics/routes/view', $data);
     }
 
-    // Ubah fungsi add_point untuk menyimpan sales_order_id
+    // LOGIC UTAMA: Tambah Titik & Update Status Order
     public function add_point($route_id) {
-        $sales_order_id = $this->input->post('sales_order_id'); // Tangkap ID Order
+        $sales_order_id = $this->input->post('sales_order_id');
         
         if($sales_order_id) {
-            // Ambil data customer dari order tersebut
-            $order = $this->db->get_where('sales_orders', ['id'=>$sales_order_id])->row();
+            // Ambil info order untuk dapat customer_id
+            $order = $this->db->get_where('sales_orders', ['id' => $sales_order_id])->row();
             
-            $data = [
-                'route_id' => $route_id,
-                'sales_order_id' => $sales_order_id, // Tambah kolom ini di tabel delivery_route_points
-                'customer_id' => $order->customer_id,
-                'status' => 'pending'
-            ];
-            
-            // Update status Order jadi 'delivering' otomatis saat masuk rute
-            $this->db->where('id', $sales_order_id)->update('sales_orders', ['status' => 'delivering']);
-            
-            // ... panggil model untuk simpan ...
-        }
-    }
+            if($order) {
+                $data = [
+                    'route_id'       => $route_id,
+                    'sales_order_id' => $sales_order_id, // Simpan ID Invoice
+                    'customer_id'    => $order->customer_id,
+                    'sequence_number'=> $this->input->post('sequence_number'),
+                    'status'         => 'pending'
+                ];
+                
+                $this->Delivery_model->insert_point($data);
 
-    // Action: Tambah Customer ke Rute
-    public function add_point($route_id) {
-        $customer_id = $this->input->post('customer_id');
-        if($customer_id) {
-            // Hitung urutan terakhir
-            $last_point = $this->db->order_by('sequence_number', 'DESC')->get_where('delivery_route_points', ['route_id'=>$route_id])->row();
-            $seq = $last_point ? $last_point->sequence_number + 1 : 1;
-
-            $data = [
-                'route_id' => $route_id,
-                'customer_id' => $customer_id,
-                'sequence_number' => $seq,
-                'status' => 'pending'
-            ];
-            $this->Delivery_model->add_point($data);
-            $this->session->set_flashdata('message', 'Tujuan berhasil ditambahkan');
+                // OTOMATIS: Update Status Order jadi 'delivering'
+                // Ini akan memicu pengurangan stok jika logika Sales Anda sudah jalan
+                $this->db->where('id', $sales_order_id);
+                $this->db->update('sales_orders', ['status' => 'delivering']);
+                
+                $this->session->set_flashdata('message', 'Order berhasil ditambahkan ke rute.');
+            }
         }
         redirect('logistics/routes/view/'.$route_id);
     }
 
-    public function delete_point($route_id, $point_id) {
+    // UPDATE: Hapus Titik & Kembalikan Status Order
+    public function delete_point($point_id, $route_id) {
+        // Cek dulu ID Ordernya sebelum dihapus
+        $point = $this->db->get_where('delivery_route_points', ['point_id' => $point_id])->row();
+        
+        if($point && $point->sales_order_id) {
+            // Kembalikan status jadi 'preparing' (Siap Kirim ulang)
+            $this->db->where('id', $point->sales_order_id);
+            $this->db->update('sales_orders', ['status' => 'preparing']);
+        }
+
         $this->Delivery_model->delete_point($point_id);
+        $this->session->set_flashdata('message', 'Titik dihapus dari rute.');
         redirect('logistics/routes/view/'.$route_id);
     }
 
-    // Fitur Cetak Surat Jalan (Sederhana)
-    public function print_surat_jalan($id) {
-        $data['route'] = $this->Delivery_model->get_route_detail($id);
+    public function print_surat_jalan($route_id) {
+        $data['route'] = $this->Delivery_model->get_route_detail($route_id);
         $this->load->view('logistics/routes/print', $data);
     }
 }
