@@ -67,7 +67,7 @@
                 </div>
 
                 <table class="table table-bordered table-striped">
-                    <thead class="bg-secondary">
+                    <thead>
                         <tr>
                             <th>Barang</th>
                             <th class="text-center">Qty</th>
@@ -76,12 +76,22 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach($items as $item): ?>
+                        <?php foreach($items as $i): ?>
                         <tr>
-                            <td><?= $item->product_name ?> (<?= $item->unit ?>)</td>
-                            <td class="text-center"><?= $item->qty ?></td>
-                            <td class="text-right">Rp <?= number_format($item->cost, 0, ',', '.') ?></td>
-                            <td class="text-right">Rp <?= number_format($item->subtotal, 0, ',', '.') ?></td>
+                            <td>
+                                <?= $i->product_name ?>
+                                <br><small class="text-muted"><?= $i->unit ?></small>
+                            </td>
+                            <td class="text-center"><?= number_format($i->qty, 0, ',', '.') ?></td>
+                            <td class="text-right">
+                                Rp <?= number_format($i->cost, 0, ',', '.') ?>
+                            </td>
+                            <td class="text-right">
+                                <?php 
+                                    $subtotal_view = $i->qty * $i->cost; 
+                                ?>
+                                Rp <?= number_format($subtotal_view, 0, ',', '.') ?>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -89,24 +99,6 @@
                         <tr>
                             <th colspan="3" class="text-right">Total Tagihan</th>
                             <th class="text-right text-lg">Rp <?= number_format($po->total_cost, 0, ',', '.') ?></th>
-                        </tr>
-                        <tr>
-                            <th colspan="3" class="text-right">Sudah Dibayar</th>
-                            <th class="text-right text-success">Rp <?= number_format($po->total_paid, 0, ',', '.') ?></th>
-                        </tr>
-                        
-                        <tr>
-                            <th colspan="3" class="text-right">Sisa Kewajiban</th>
-                            <th class="text-right">
-                                <?php if($po->status == 'canceled'): ?>
-                                    <span class="badge badge-dark">DIBATALKAN</span>
-                                    <s class="text-muted small">Rp <?= number_format($po->total_cost - $po->total_paid, 0, ',', '.') ?></s>
-                                <?php else: ?>
-                                    <span class="text-danger font-weight-bold">
-                                        Rp <?= number_format($po->total_cost - $po->total_paid, 0, ',', '.') ?>
-                                    </span>
-                                <?php endif; ?>
-                            </th>
                         </tr>
                     </tfoot>
                 </table>

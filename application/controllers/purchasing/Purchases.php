@@ -78,21 +78,44 @@ class Purchases extends CI_Controller {
     // 2. BUAT PO BARU (CREATE)
     // ==========================================================
     public function create() {
-        if ($this->input->post()) {
-            $post = $this->input->post();
+        // Validasi Form
+        $this->form_validation->set_rules('supplier_id', 'Supplier', 'required');
+        $this->form_validation->set_rules('product_id[]', 'Barang', 'required');
 
-            // Validasi Barang
-            if (empty($post['product_id'])) {
-                $this->session->set_flashdata('error', 'Pilih minimal satu barang!');
-                redirect('purchasing/purchases/create');
+        if ($this->form_validation->run() == FALSE) {
+            $data['suppliers'] = $this->db->get('suppliers')->result();
+            $data['products']  = $this->db->get('salt_products')->result();
+            $data['title']     = 'Buat PO Baru';
+            $this->template->load('purchasing/purchases/create', $data);
+        } else {
+            // 1. Helper Function: Membersihkan Format Rupiah (Indonesia)
+            // Ubah "2.700,00" -> 2700.00
+            function clean_rupiah($string) {
+                // Hapus Rp, Titik, dan Spasi
+                $no_thousands = str_replace(['Rp', '.', ' '], '', $string);
+                // Ubah Koma menjadi Titik Desimal
+                $decimal_ready = str_replace(',', '.', $no_thousands);
+                return (float) $decimal_ready;
             }
 
-            // A. Header PO
-            $header = [
+            // 2. AMBIL DATA
+            $post = $this->input->post();
+            
+            // Validasi Array
+            if (empty($post['product_id']) || count($post['product_id']) == 0) {
+                $this->session->set_flashdata('error', 'Minimal harus ada 1 barang!');
+                redirect('purchasing/purchases/create');
+                return;
+            }
+
+            // 3. Header PO
+            $clean_total = clean_rupiah($post['grand_total']); // Gunakan fungsi helper tadi
+
+            $header_data = [
                 'purchase_no'   => $this->Purchase_model->generate_po_number(),
-                'supplier_id'   => $post['supplier_id'],
                 'purchase_date' => $post['purchase_date'],
-                'total_cost'    => str_replace(['Rp', '.', ' '], '', $post['grand_total']),
+                'supplier_id'   => $post['supplier_id'],
+                'total_cost'    => $clean_total,
                 'total_paid'    => 0,
                 'status'        => 'ordered',
                 'payment_status'=> 'unpaid',
@@ -100,36 +123,40 @@ class Purchases extends CI_Controller {
                 'created_at'    => date('Y-m-d H:i:s')
             ];
 
-            // B. Items PO
-            $items = [];
+            // Simpan Header
+            $new_po_id = $this->Purchase_model->create_purchase_header($header_data);
+
+            // 4. Items PO
+            $items_batch = [];
             $count = count($post['product_id']);
+            
             for ($i = 0; $i < $count; $i++) {
-                if(!empty($post['product_id'][$i])) {
-                    $items[] = [
-                        'product_id' => $post['product_id'][$i],
-                        'qty'        => $post['qty'][$i],
-                        'cost'       => str_replace(['Rp', '.', ' '], '', $post['price'][$i]), // Harga Beli
-                        'subtotal'   => str_replace(['Rp', '.', ' '], '', $post['subtotal'][$i])
+                if (!empty($post['product_id'][$i])) {
+                    
+                    // BERSIHKAN ANGKA DENGAN BENAR
+                    $clean_cost = clean_rupiah($post['price'][$i]);
+                    $qty        = (float) $post['qty'][$i];
+                    
+                    // Hitung Subtotal di Server (Lebih Aman daripada ambil dari input hidden)
+                    $subtotal   = $qty * $clean_cost;
+
+                    $items_batch[] = [
+                        'purchase_id' => $new_po_id,
+                        'product_id'  => $post['product_id'][$i],
+                        'qty'         => $qty,
+                        'cost'        => $clean_cost, // Angka Murni (2700)
+                        'subtotal'    => $subtotal
                     ];
                 }
             }
 
-            // Simpan via Model dan Tangkap ID Baru
-            $new_id = $this->Purchase_model->create_purchase($header, $items);
-
-            if ($new_id) {
-                $this->session->set_flashdata('message', 'PO berhasil dibuat.');
-                redirect('purchasing/purchases/detail/' . $new_id);
-            } else {
-                $this->session->set_flashdata('error', 'Gagal menyimpan data.');
-                redirect('purchasing/purchases/create');
+            if (!empty($items_batch)) {
+                $this->db->insert_batch('purchase_items', $items_batch);
             }
-        }
 
-        $data['suppliers'] = $this->db->get('suppliers')->result();
-        $data['products']  = $this->db->get('salt_products')->result();
-        $data['title']     = 'Buat PO Baru';
-        $this->template->load('purchasing/purchases/create', $data);
+            $this->session->set_flashdata('message', 'PO berhasil dibuat.');
+            redirect('purchasing/purchases/detail/' . $new_po_id);
+        }
     }
 
     // ==========================================================

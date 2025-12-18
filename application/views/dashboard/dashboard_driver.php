@@ -1,84 +1,60 @@
 <div class="row">
     <div class="col-12">
-        <div class="info-box bg-gradient-dark">
-            <span class="info-box-icon"><i class="fas fa-truck"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Rute Hari Ini: <?= date('d M Y') ?></span>
-                <div class="progress">
-                    <?php 
-                        $percent = ($total_drop > 0) ? ($done_drop / $total_drop) * 100 : 0;
-                    ?>
-                    <div class="progress-bar bg-success" style="width: <?= $percent ?>%"></div>
-                </div>
-                <span class="progress-description">
-                    Selesai: <b><?= $done_drop ?></b> / <?= $total_drop ?> Titik
-                </span>
-            </div>
+        <div class="callout callout-info">
+            <h5><i class="fas fa-user-circle"></i> Halo, <?= $this->session->userdata('full_name') ?>!</h5>
+            <p>Tetap hati-hati di jalan dan cek kondisi kendaraan.</p>
         </div>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-12">
-        <?php if(empty($my_route)): ?>
-            <div class="callout callout-danger text-center py-5">
-                <i class="fas fa-mug-hot fa-3x text-muted mb-3"></i>
-                <h4>Tidak ada jadwal pengiriman hari ini.</h4>
-                <p>Silakan standby atau hubungi Admin Logistik.</p>
+    <div class="col-6">
+        <div class="info-box bg-gradient-info">
+            <span class="info-box-icon"><i class="fas fa-map-marker-alt"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Total Titik</span>
+                <span class="info-box-number"><?= $total_drop ?> Lokasi</span>
             </div>
-        <?php else: ?>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="info-box bg-gradient-success">
+            <span class="info-box-icon"><i class="fas fa-check"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Selesai</span>
+                <span class="info-box-number"><?= $done_drop ?> Lokasi</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-outline card-primary">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-truck"></i> Rute Hari Ini (<?= date('d M Y') ?>)
+        </h3>
+    </div>
+    <div class="card-body text-center">
+        <?php if($my_route): ?>
+            <h3 class="text-primary mb-3">
+                <?= $done_drop ?> / <?= $total_drop ?> Selesai
+            </h3>
+            <div class="progress mb-4" style="height: 20px;">
+                <?php $persen = ($total_drop > 0) ? ($done_drop/$total_drop)*100 : 0; ?>
+                <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width: <?= $persen ?>%"></div>
+            </div>
             
-            <div class="card">
-                <div class="card-header border-0 bg-light">
-                    <h3 class="card-title text-primary"><i class="fas fa-map-signs"></i> Urutan Pengiriman</h3>
-                </div>
-                <div class="card-body">
-                    <div class="timeline">
-                        <div class="time-label">
-                            <span class="bg-success">MULAI (GUDANG)</span>
-                        </div>
-
-                        <?php foreach($my_route->points as $p): ?>
-                        <div>
-                            <i class="fas fa-store bg-<?= $p->status == 'delivered' ? 'gray' : 'blue' ?>"></i>
-                            <div class="timeline-item">
-                                <span class="time"><i class="fas fa-clock"></i> Urutan #<?= $p->sequence_number ?></span>
-                                
-                                <h3 class="timeline-header">
-                                    <a href="#"><?= $p->customer_name ?></a>
-                                    <?php if($p->status == 'delivered'): ?>
-                                        <span class="badge badge-success ml-2">SELESAI</span>
-                                    <?php endif; ?>
-                                </h3>
-
-                                <div class="timeline-body">
-                                    <?= $p->address ?> <br>
-                                    <small class="text-muted"><i class="fas fa-phone"></i> <?= $p->phone ?></small>
-                                </div>
-                                
-                                <div class="timeline-footer">
-                                    <?php if($p->status == 'pending'): ?>
-                                        <a href="https://www.google.com/maps/dir/?api=1&destination=<?= urlencode($p->address) ?>" target="_blank" class="btn btn-primary btn-sm">
-                                            <i class="fas fa-directions"></i> Navigasi Maps
-                                        </a>
-                                        <button class="btn btn-success btn-sm float-right">
-                                            <i class="fas fa-check"></i> Tandai Sampai
-                                        </button>
-                                    <?php else: ?>
-                                        <span class="text-muted text-sm font-italic">Paket telah diterima.</span>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-
-                        <div>
-                            <i class="fas fa-flag-checkered bg-gray"></i>
-                        </div>
-                    </div>
-                </div>
+            <p class="text-muted">Kendaraan: <b><?= $my_route->vehicle ?></b></p>
+            
+            <a href="<?= site_url('logistics/routes/view/'.$my_route->route_id) ?>" class="btn btn-lg btn-primary btn-block">
+                <i class="fas fa-play"></i> LIHAT DAFTAR PENGIRIMAN
+            </a>
+        <?php else: ?>
+            <div class="py-5">
+                <i class="fas fa-coffee fa-4x text-gray mb-3"></i>
+                <h4>Tidak ada jadwal pengiriman hari ini.</h4>
+                <p>Silakan istirahat atau hubungi admin logistik.</p>
             </div>
-
         <?php endif; ?>
     </div>
 </div>
