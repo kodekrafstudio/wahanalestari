@@ -5,7 +5,7 @@ class Sales_model extends CI_Model {
 
     public function __construct() {
         parent::__construct();
-        // Load di sini sekali saja agar bisa dipakai semua fungsi
+        // Load Inventory Model untuk mutasi stok
         $this->load->model('Inventory_model'); 
     }
     
@@ -46,8 +46,8 @@ class Sales_model extends CI_Model {
                 'sales_order_id' => $insert_id,
                 'product_id'     => $item['product_id'],
                 'qty'            => $item['qty'],
-                'cost'           => $item['cost'],     // HPP
-                'price'          => $item['price'],    // Harga Jual
+                'cost'           => $item['cost'],     
+                'price'          => $item['price'],    
                 'discount'       => $item['discount'],
                 'subtotal'       => $item['subtotal']
             ];
@@ -61,7 +61,7 @@ class Sales_model extends CI_Model {
         return $this->db->trans_status() === FALSE ? FALSE : $insert_id;
     }
 
-    // 3. AMBIL DETAIL HEADER + ITEM (Versi Nested)
+    // 3. AMBIL DETAIL HEADER + ITEM
     public function get_order_detail($id) {
         $this->db->select('so.*, c.name as customer_name, c.address, c.city, c.phone, 
                            u.full_name as creator_name, 
@@ -74,33 +74,20 @@ class Sales_model extends CI_Model {
         $header = $this->db->get()->row();
 
         if ($header) {
-            // Panggil fungsi get_items yang baru kita buat agar konsisten
             $header->items = $this->get_items($id);
         }
         return $header;
     }
 
-    // Load Model Inventory di Constructor agar tidak lupa
-    // (Tambahkan __construct di paling atas Sales_model)
-    /*
-    public function __construct() {
-        parent::__construct();
-        $this->load->model('Inventory_model');
-    }
-    */
-
-    // 4. POTONG STOK (Via Inventory Model)
+    // 4. POTONG STOK (DEDUCT)
     public function deduct_stock_multi($order_id) {
-        // Pastikan Inventory Model sudah di-load
-        $this->load->model('Inventory_model');
-        
         $items = $this->get_items($order_id);
         $order = $this->db->get_where('sales_orders', ['id'=>$order_id])->row();
         
         if(!empty($items)) {
             foreach($items as $item) {
                 $desc = "Penjualan: " . $order->invoice_no;
-                // Kirim nilai NEGATIF untuk mengurangi
+                // Nilai negatif untuk mengurangi
                 $qty_change = -1 * abs($item->qty); 
                 
                 $this->Inventory_model->adjust_stock(
@@ -113,19 +100,18 @@ class Sales_model extends CI_Model {
         }
     }
 
-    // 5. KEMBALIKAN STOK (Via Inventory Model)
+    // 5. KEMBALIKAN STOK (RESTORE)
     public function restore_stock_multi($order_id) {
-        $this->load->model('Inventory_model');
-        
         $items = $this->get_items($order_id);
         $order = $this->db->get_where('sales_orders', ['id'=>$order_id])->row();
         
         if(!empty($items)) {
             foreach($items as $item) {
-                $desc = "Batal Penjualan: " . $order->invoice_no;
-                // Kirim nilai POSITIF untuk menambah kembali
+                $desc = "Batal/Retur Penjualan: " . $order->invoice_no;
+                // Nilai POSITIF untuk menambah kembali
                 $qty_change = abs($item->qty); 
                 
+                // HANYA PAKAI INI (Jangan ada manual query update warehouse_stock lagi)
                 $this->Inventory_model->adjust_stock(
                     $item->product_id, 
                     $qty_change, 
@@ -145,17 +131,17 @@ class Sales_model extends CI_Model {
     public function add_payment($data) {
         $this->db->trans_start();
 
-        // Simpan
+        // Simpan Payment
         $this->db->insert('sales_payments', $data);
 
-        // Update Total Bayar
+        // Update Total Bayar di Header
         $order_id = $data['sales_order_id'];
         $amount   = $data['amount'];
         $this->db->set('total_paid', "total_paid + $amount", FALSE);
         $this->db->where('id', $order_id);
         $this->db->update('sales_orders');
 
-        // Cek Lunas
+        // Cek Status Lunas
         $order = $this->db->get_where('sales_orders', ['id' => $order_id])->row();
         $tagihan = ($order->grand_total > 0) ? $order->grand_total : $order->total_amount;
 
@@ -173,7 +159,7 @@ class Sales_model extends CI_Model {
         return $this->db->trans_status();
     }
 
-    // 8. AMBIL ITEM ORDER (INI YANG TADI KURANG)
+    // 8. AMBIL ITEM ORDER
     public function get_items($order_id) {
         $this->db->select('soi.*, p.name as product_name, p.unit');
         $this->db->from('sales_order_items soi');

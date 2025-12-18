@@ -1,12 +1,3 @@
-<div class="row mb-3">
-    <div class="col-12">
-        <div class="callout callout-info">
-            <h5><i class="fas fa-briefcase"></i> Investor Dashboard</h5>
-            <p>Laporan ini disusun secara otomatis berdasarkan standar akuntansi dasar. Gunakan data ini untuk presentasi kinerja bisnis.</p>
-        </div>
-    </div>
-</div>
-
 <div class="row">
     <div class="col-md-3 col-sm-6 col-12">
         <div class="info-box bg-gradient-success">
@@ -57,7 +48,7 @@
     <div class="col-md-6">
         <div class="card card-primary card-outline">
             <div class="card-header">
-                <h3 class="card-title text-bold">Laporan Laba Rugi (Income Statement)</h3>
+                <h3 class="card-title text-bold">Laporan Laba Rugi</h3>
                 <div class="card-tools">
                     <form class="form-inline" method="get">
                         <select name="month" class="form-control form-control-sm mr-1">

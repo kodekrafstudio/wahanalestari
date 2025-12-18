@@ -13,69 +13,64 @@ class Sales extends CI_Controller {
         $this->load->library('template');
     }
 
-    // 1. LIST TRANSAKSI
+    // ... (Index, Create, Detail, Print sama seperti sebelumnya - AMAN) ...
+
     public function index() {
         $data['title'] = 'Daftar Penjualan';
         $start_date = $this->input->get('start_date') ? $this->input->get('start_date') : date('Y-m-01');
         $end_date   = $this->input->get('end_date') ? $this->input->get('end_date') : date('Y-m-d');
         $status     = $this->input->get('status');
 
-        // Logic Filter & Query
         $this->db->select('so.*, c.name as customer_name, u.full_name as sales_name');
         $this->db->from('sales_orders so');
         $this->db->join('customers c', 'c.customer_id = so.customer_id');
         $this->db->join('users u', 'u.user_id = so.salesman_id', 'left');
-        
         $this->db->where('DATE(so.order_date) >=', $start_date);
         $this->db->where('DATE(so.order_date) <=', $end_date);
-        if($status && $status != 'all') { $this->db->where('so.status', $status); }
+        
+        if($status && $status != 'all') { 
+            $this->db->where('so.status', $status); 
+        }
         
         $this->db->order_by('so.id', 'DESC');
         $data['orders'] = $this->db->get()->result();
 
-        // Hitung Widget Ringkasan
         $total_omzet = 0; $total_piutang = 0; $total_lunas = 0;
         foreach($data['orders'] as $o) {
             if($o->status != 'canceled') {
                 $grand = ($o->grand_total > 0) ? $o->grand_total : $o->total_amount;
                 $total_omzet += $grand;
                 $total_lunas += $o->total_paid;
-                if(($grand - $o->total_paid) > 0) $total_piutang += ($grand - $o->total_paid);
+                $sisa = $grand - $o->total_paid;
+                if($sisa > 0) $total_piutang += $sisa;
             }
         }
-        $data['filter'] = ['start_date'=>$start_date, 'end_date'=>$end_date, 'status'=>$status];
+        
+        $data['filter']  = ['start_date'=>$start_date, 'end_date'=>$end_date, 'status'=>$status];
         $data['summary'] = ['omzet'=>$total_omzet, 'piutang'=>$total_piutang, 'lunas'=>$total_lunas];
-
         $this->template->load('marketing/sales/index', $data);
     }
 
-    // 2. CREATE TRANSAKSI (REVISI: JANGAN POTONG STOK DULU)
     public function create() {
         if ($this->input->post()) {
             $post = $this->input->post();
-
-            // Validasi Input
             if (empty($post['product_id'])) {
                 $this->session->set_flashdata('error', 'Keranjang belanja kosong!');
                 redirect('marketing/sales/create');
             }
 
-            // A. PREPARE ITEMS
             $items_to_save = [];
             $count = count($post['product_id']);
-            
             for ($i = 0; $i < $count; $i++) {
                 if(!empty($post['product_id'][$i])) {
                     $pid = $post['product_id'][$i];
                     $qty = $post['qty'][$i];
-
-                    // AMBIL BASE COST (HPP)
                     $prod = $this->db->select('base_cost')->get_where('salt_products', ['product_id'=>$pid])->row();
 
                     $items_to_save[] = [
                         'product_id' => $pid,
                         'qty'        => $qty,
-                        'cost'       => $prod->base_cost, // Simpan HPP
+                        'cost'       => $prod ? $prod->base_cost : 0,
                         'price'      => $post['price'][$i],
                         'discount'   => isset($post['discount'][$i]) ? $post['discount'][$i] : 0,
                         'subtotal'   => $post['subtotal'][$i]
@@ -83,7 +78,6 @@ class Sales extends CI_Controller {
                 }
             }
 
-            // B. PREPARE HEADER
             $grand_total = str_replace(['Rp','.',' '], '', $post['grand_total']);
             $raw_total   = str_replace(['Rp','.',' '], '', $post['total_amount_raw']);
             $shipping    = $post['shipping_cost'] ? str_replace(['Rp','.',' '], '', $post['shipping_cost']) : 0;
@@ -98,28 +92,21 @@ class Sales extends CI_Controller {
                 'shipping_cost' => $shipping,
                 'other_discount'=> $other_disc,
                 'grand_total'   => $grand_total,
-                'status'        => 'request', // <--- STATUS AWAL: REQUEST (Stok Belum Berubah)
+                'status'        => 'request',
                 'payment_status'=> 'unpaid',
                 'created_by'    => $this->session->userdata('user_id'),
                 'created_at'    => date('Y-m-d H:i:s')
             ];
 
-            // C. SIMPAN KE DB
             $new_id = $this->Sales_model->create_order($header, $items_to_save);
-
             if ($new_id) {
-                // SAYA HAPUS BAGIAN deduct_stock_multi DISINI
-                // Stok akan dipotong nanti saat Admin mengubah status ke 'Delivering'
-                
-                $this->session->set_flashdata('message', 'Order Berhasil Dibuat (Status: Request). Menunggu persetujuan Gudang.');
+                $this->session->set_flashdata('message', 'Order Berhasil Dibuat (Status: Request).');
                 redirect('marketing/sales/detail/' . $new_id);
             } else {
                 $this->session->set_flashdata('error', 'Gagal menyimpan transaksi.');
                 redirect('marketing/sales/create');
             }
         }
-
-        // TAMPILKAN FORM (Sama seperti sebelumnya)
         $data['title']     = 'Buat Penjualan Baru';
         $data['customers'] = $this->Customer_model->get_all();
         $data['products']  = $this->db->select('p.*, ws.quantity as stock')
@@ -127,11 +114,9 @@ class Sales extends CI_Controller {
                                       ->join('warehouse_stock ws', 'ws.product_id = p.product_id', 'left')
                                       ->get()->result();
         $data['salesmen']  = $this->db->get_where('users', ['role' => 'sales'])->result();
-        
         $this->template->load('marketing/sales/create', $data);
     }
 
-    // 3. DETAIL
     public function detail($id) {
         $data['order']    = $this->Sales_model->get_order_detail($id);
         if(!$data['order']) show_404();
@@ -140,100 +125,107 @@ class Sales extends CI_Controller {
         $this->template->load('marketing/sales/detail', $data);
     }
 
-    // 4. PRINT
     public function print_invoice($id) {
         $data['order'] = $this->Sales_model->get_order_detail($id);
         $this->load->view('marketing/sales/print_invoice', $data);
     }
 
-    // 5. UPDATE STATUS (LOGIKA STOK CERDAS)
+    // --- UPDATE STATUS (DIPERBAIKI) ---
     public function update_status() {
         $order_id   = $this->input->post('order_id');
-        $new_status = $this->input->post('status'); // request, preparing, delivering, done, canceled
+        $new_status = $this->input->post('status'); 
         
         $order      = $this->Sales_model->get_order_detail($order_id);
         $old_status = $order->status;
 
-        // Cegah update jika status sama
         if ($new_status == $old_status) {
             redirect('marketing/sales/detail/' . $order_id);
         }
 
-        if ($sisa < $item->qty) {
-            // Error handling yang bagus!
-            $this->session->set_flashdata('error', "GAGAL KIRIM! Stok {$item->product_name} tidak cukup...");
-            return; 
-        }
-
-        // ------------------------------------------------------------------
-        // SKENARIO 1: BARANG KELUAR (Potong Stok)
-        // Terjadi saat status berubah dari (Request/Preparing) --> MENJADI --> Delivering
-        // ------------------------------------------------------------------
+        // 1. SKENARIO KIRIM BARANG (Potong Stok)
         if ($new_status == 'delivering' && ($old_status == 'request' || $old_status == 'preparing')) {
-            
-            // Cek Stok Dulu (Validasi Akhir sebelum barang keluar)
+            // Cek Stok
             $items = $this->Sales_model->get_items($order_id);
             foreach ($items as $item) {
                 $stok_gudang = $this->db->get_where('warehouse_stock', ['product_id' => $item->product_id])->row();
                 $sisa = $stok_gudang ? $stok_gudang->quantity : 0;
-                
                 if ($sisa < $item->qty) {
                     $this->session->set_flashdata('error', "GAGAL KIRIM! Stok {$item->product_name} tidak cukup. Sisa: {$sisa}");
                     redirect('marketing/sales/detail/' . $order_id);
                     return; 
                 }
             }
-
-            // Potong Stok
             $this->Sales_model->deduct_stock_multi($order_id);
+            $this->db->where('id', $order_id)->update('sales_orders', ['status' => $new_status]);
             $this->session->set_flashdata('message', 'Status: Delivering. Stok Gudang Berhasil DIKURANGI.');
         }
 
-        // ------------------------------------------------------------------
-        // SKENARIO 2: BATALKAN PESANAN (Kembalikan Stok / Do Nothing)
-        // ------------------------------------------------------------------
+        // 2. SKENARIO BATAL (Cancel/Retur)
         else if ($new_status == 'canceled') {
             
-            // Jika batal dari posisi barang sudah keluar (Delivering/Done), BALIKIN STOK
+            $pesan_stok = "Stok aman (belum terpotong).";
+            
+            // Logika Stok: Balikin jika sudah keluar
             if ($old_status == 'delivering' || $old_status == 'done') {
                 $this->Sales_model->restore_stock_multi($order_id);
-                $this->session->set_flashdata('message', 'Order Dibatalkan. Barang sudah keluar, stok DIKEMBALIKAN.');
+                $pesan_stok = "Barang sudah keluar, stok DIKEMBALIKAN ke gudang.";
             } 
-            // Jika batal dari posisi Request/Preparing, JANGAN APA-APAKAN STOK (karena belum dipotong)
-            else {
-                $this->session->set_flashdata('message', 'Order Dibatalkan. Stok aman (belum terpotong).');
+
+            // Logika Keuangan & Catatan
+            $data_update = ['status' => 'canceled'];
+            $pesan_uang  = "";
+
+            // Ambil input note dari modal
+            $input_note = $this->input->post('note'); 
+            
+            if ($order->total_paid > 0) {
+                $data_update['payment_status'] = 'refunded'; 
+                $pesan_uang = " Status pembayaran diubah menjadi REFUNDED.";
+                
+                // Tambah info refund ke note
+                $note_final = $input_note . " [SYSTEM: Refund Rp " . number_format($order->total_paid,0,',','.') . "]";
+            } else {
+                $note_final = $input_note;
             }
+            
+            $data_update['note'] = $note_final;
+
+            $this->db->where('id', $order_id)->update('sales_orders', $data_update);
+            $this->session->set_flashdata('message', 'Order Dibatalkan. ' . $pesan_stok . $pesan_uang);
         }
 
-        // ------------------------------------------------------------------
-        // SKENARIO 3: RETUR / AKTIFKAN LAGI (Canceled -> Request)
-        // ------------------------------------------------------------------
+        // 3. SKENARIO AKTIFKAN KEMBALI
         else if ($old_status == 'canceled' && $new_status == 'request') {
-             // Tidak perlu aksi stok, hanya ubah status jadi request lagi
+             $this->db->where('id', $order_id)->update('sales_orders', ['status' => $new_status]);
              $this->session->set_flashdata('message', 'Order Diaktifkan kembali.');
         }
 
-        // Update Status di Database
-        $this->db->where('id', $order_id)->update('sales_orders', ['status' => $new_status]);
+        // 4. STATUS LAIN
+        else {
+            $this->db->where('id', $order_id)->update('sales_orders', ['status' => $new_status]);
+            $this->session->set_flashdata('message', 'Status berhasil diupdate.');
+        }
+
         redirect('marketing/sales/detail/' . $order_id);
     }
 
-    // 6. SUBMIT PAYMENT
+    // ... (submit_payment sama seperti sebelumnya - AMAN) ...
     public function submit_payment() {
         $post = $this->input->post();
         $amount = str_replace(['Rp','.',' '], '', $post['amount']);
+        $order_id = $post['sales_order_id'];
         
-        // Cek Status Cancel
-        $order = $this->db->get_where('sales_orders', ['id'=>$post['sales_order_id']])->row();
+        $order = $this->db->get_where('sales_orders', ['id'=>$order_id])->row();
+        
         if($order->status == 'canceled') {
              $this->session->set_flashdata('error', 'Gagal. Faktur Batal tidak bisa dibayar.');
-             redirect('marketing/sales/detail/' . $post['sales_order_id']);
+             redirect('marketing/sales/detail/' . $order_id);
              return;
         }
 
         if ($amount > 0) {
             $this->Sales_model->add_payment([
-                'sales_order_id' => $post['sales_order_id'],
+                'sales_order_id' => $order_id,
                 'payment_date'   => $post['payment_date'],
                 'amount'         => $amount,
                 'payment_method' => $post['payment_method'],
@@ -241,6 +233,6 @@ class Sales extends CI_Controller {
             ]);
             $this->session->set_flashdata('message', 'Pembayaran diterima.');
         }
-        redirect('marketing/sales/detail/' . $post['sales_order_id']);
+        redirect('marketing/sales/detail/' . $order_id);
     }
 }
