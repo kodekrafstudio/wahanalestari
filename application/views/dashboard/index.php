@@ -1,3 +1,6 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
 <div class="row mb-2">
     <div class="col-sm-6">
         <h4 class="m-0 text-dark">Executive Dashboard</h4>
@@ -98,15 +101,20 @@
 
 <div class="row">
     <div class="col-12">
-        <div class="card card-outline card-purple">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-map-marked-alt mr-1"></i> Sebaran Pelanggan (WebGIS)</h3>
+        <div class="card card-outline card-info">
+            <div class="card-header border-0">
+                <h3 class="card-title">
+                    <i class="fas fa-calendar-day mr-1"></i> 
+                    Tren Penjualan Harian: <strong><?= $month_name ?></strong>
+                </h3>
                 <div class="card-tools">
                     <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i></button>
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div id="dashboardMap" style="height: 400px; width: 100%;"></div>
+            <div class="card-body">
+                <div class="chart">
+                    <canvas id="dailyChart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -193,11 +201,27 @@
     </div>
 </div>
 
+<div class="row">
+    <div class="col-12">
+        <div class="card card-outline card-purple">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-map-marked-alt mr-1"></i> Sebaran Pelanggan (Live Map)</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i></button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="dashboardMap" style="height: 450px; width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 window.addEventListener('load', function() {
     
-    // --- 1. SETUP CHART ---
+    // --- 1. SETUP CHART (OMZET & PROFIT) ---
     if(document.getElementById('mainChart')) {
         var ctx = document.getElementById('mainChart').getContext('2d');
         new Chart(ctx, {
@@ -205,14 +229,41 @@ window.addEventListener('load', function() {
             data: {
                 labels: ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
                 datasets: [
-                    { label: 'Omzet', data: <?= $chart_omzet ?>, borderColor: '#3b8bba', fill: false },
-                    { label: 'Profit', data: <?= $chart_profit ?>, borderColor: '#28a745', fill: false }
+                    { 
+                        label: 'Omzet', 
+                        data: <?= $chart_omzet ?>, 
+                        borderColor: '#17a2b8', // Info Blue
+                        backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                        fill: true,
+                        pointRadius: 3 // Titik chart diperkecil juga biar rapi
+                    },
+                    { 
+                        label: 'Profit', 
+                        data: <?= $chart_profit ?>, 
+                        borderColor: '#28a745', // Success Green
+                        fill: false,
+                        pointRadius: 3
+                    }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            return 'Rp ' + tooltipItem.yLabel.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                        }
+                    }
+                },
+                scales: {
+                    yAxes: [{ ticks: { callback: function(value) { return 'Rp ' + value/1000000 + ' Jt'; } } }]
+                }
+            }
         });
     }
 
+    // --- 2. PIE CHART (PRODUK) ---
     if(document.getElementById('pieChart')) {
         var pLabels = <?= $pie_labels ?>;
         var pData = <?= $pie_data ?>;
@@ -222,27 +273,111 @@ window.addEventListener('load', function() {
             type: 'doughnut',
             data: {
                 labels: pLabels,
-                datasets: [{ data: pData, backgroundColor: ['#f56954','#00a65a','#f39c12','#00c0ef','#3c8dbc'] }]
+                datasets: [{ 
+                    data: pData, 
+                    backgroundColor: ['#f56954','#00a65a','#f39c12','#00c0ef','#3c8dbc', '#d2d6de'],
+                    borderWidth: 1
+                }]
             },
             options: { responsive: true, maintainAspectRatio: false, legend: {position:'bottom'} }
         });
     }
 
-    // --- 2. SETUP MAP (LEAFLET) ---
+    // --- 3. MAPS (WEBGIS) - TITIK KECIL (DOTS) ---
     if(document.getElementById('dashboardMap')) {
-        var map = L.map('dashboardMap').setView([-6.9, 110.4], 9); // Koordinat Default (Jawa Tengah)
+        var map = L.map('dashboardMap'); 
+
+        // Gunakan peta yang lebih bersih/terang (CartoDB Positron) agar titik terlihat jelas
+        // Atau tetap pakai OSM standar
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        var markers = <?= $map_data ?>; // Data dari Controller
-        
-        // Loop marker
-        markers.forEach(function(m) {
+        var markersData = <?= $map_data ?>; 
+        var markerArray = [];
+
+        markersData.forEach(function(m) {
             if(m.latitude && m.longitude) {
-                L.marker([m.latitude, m.longitude])
-                 .addTo(map)
-                 .bindPopup("<b>"+m.name+"</b><br>"+m.address);
+                var lat = parseFloat(m.latitude);
+                var lng = parseFloat(m.longitude);
+
+                // GANTI DARI L.marker KE L.circleMarker
+                var marker = L.circleMarker([lat, lng], {
+                    radius: 6,          // Ukuran titik (semakin kecil angkanya, semakin kecil titiknya)
+                    fillColor: "#ff0000", // Warna Merah (Bisa diganti hex code lain, misal #007bff biru)
+                    color: "#ffffff",     // Warna Garis Tepi (Putih biar kontras)
+                    weight: 1,            // Ketebalan garis tepi
+                    opacity: 1,
+                    fillOpacity: 0.8      // Transparansi (0.8 = agak solid)
+                })
+                .addTo(map)
+                .bindPopup(`
+                    <div style="text-align:center; min-width: 150px;">
+                        <b style="color:#333;">${m.name}</b><br>
+                        <span class="badge badge-info" style="font-size:10px;">${m.category_name || 'Umum'}</span><br>
+                        <div style="font-size:11px; margin-top:4px; color:#666;">${m.address}</div>
+                    </div>
+                `);
+                
+                markerArray.push(marker); 
+            }
+        });
+
+        // Auto Zoom agar pas semua titik
+        if (markerArray.length > 0) {
+            var group = new L.featureGroup(markerArray);
+            map.fitBounds(group.getBounds().pad(0.1));
+        } else {
+            map.setView([-7.7956, 110.3695], 10); 
+        }
+        
+        setTimeout(function(){ map.invalidateSize(); }, 800);
+    }
+
+    // --- 4. SETUP CHART HARIAN (BAR CHART) ---
+    if(document.getElementById('dailyChart')) {
+        var ctxDaily = document.getElementById('dailyChart').getContext('2d');
+        new Chart(ctxDaily, {
+            type: 'bar', // Pakai Bar Chart biar beda dengan tahunan
+            data: {
+                labels: <?= $daily_labels ?>, // [1, 2, 3... 31]
+                datasets: [{
+                    label: 'Omzet Harian',
+                    data: <?= $chart_daily ?>,
+                    backgroundColor: '#17a2b8', // Warna Biru Info
+                    borderColor: '#117a8b',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: true,
+                            // Format Rupiah Singkat (1jt, 500k)
+                            callback: function(value) {
+                                if(value >= 1000000) return 'Rp ' + value/1000000 + ' Jt';
+                                if(value >= 1000) return 'Rp ' + value/1000 + ' k';
+                                return value;
+                            }
+                        }
+                    }],
+                    xAxes: [{
+                        gridLines: { display: false } // Biar bersih
+                    }]
+                },
+                tooltips: {
+                    callbacks: {
+                        title: function(tooltipItem) {
+                            return 'Tanggal ' + tooltipItem[0].xLabel + ' <?= $month_name ?>';
+                        },
+                        label: function(tooltipItem) {
+                            return 'Rp ' + tooltipItem.yLabel.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                        }
+                    }
+                }
             }
         });
     }

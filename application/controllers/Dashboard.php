@@ -115,6 +115,21 @@ class Dashboard extends CI_Controller {
             $data['pie_labels'] = json_encode($p_names);
             $data['pie_data']   = json_encode($p_qty);
 
+            // ... (Kode chart_omzet & chart_profit tetap ada) ...
+            
+            // --- TAMBAHAN: CHART HARIAN ---
+            $daily_sales = $this->Dashboard_model->get_daily_trend($filter_month, $filter_year);
+            $data['chart_daily'] = json_encode($daily_sales);
+            
+            // Buat label tanggal 1 s/d 30/31
+            $days_count = cal_days_in_month(CAL_GREGORIAN, $filter_month, $filter_year);
+            $data['daily_labels'] = json_encode(range(1, $days_count));
+            
+            // Nama bulan untuk judul grafik
+            $data['month_name'] = date('F Y', mktime(0, 0, 0, $filter_month, 1, $filter_year));
+            
+            // ... (lanjut ke map_data) ...
+
             $this->template->load('dashboard/index', $data);
         }
     }

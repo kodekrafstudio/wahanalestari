@@ -87,4 +87,35 @@ class Dashboard_model extends CI_Model {
     public function get_map_markers() {
         return $this->db->select('name, address, latitude, longitude')->from('customers')->where('latitude !=', '')->get()->result();
     }
+
+
+    // 6. FITUR BARU: TREN HARIAN
+    public function get_daily_trend($month, $year) {
+        // Hitung jumlah hari dalam bulan tsb
+        $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $daily_data = [];
+
+        // Siapkan array kosong [1=>0, 2=>0, ... 31=>0]
+        for ($d = 1; $d <= $days_in_month; $d++) {
+            $daily_data[$d] = 0;
+        }
+
+        // Query Group By Tanggal
+        $this->db->select('DAY(order_date) as day, SUM(total_amount) as total');
+        $this->db->where([
+            'MONTH(order_date)' => $month, 
+            'YEAR(order_date)'  => $year, 
+            'status !='         => 'canceled'
+        ]);
+        $this->db->group_by('DAY(order_date)');
+        $query = $this->db->get('sales_orders')->result();
+
+        // Isi data ke array
+        foreach ($query as $row) {
+            $daily_data[(int)$row->day] = (int) $row->total;
+        }
+
+        // Return hanya values-nya saja agar jadi JSON array [0, 50000, 0...]
+        return array_values($daily_data);
+    }
 }

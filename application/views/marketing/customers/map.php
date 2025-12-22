@@ -116,7 +116,7 @@ window.addEventListener('load', function() {
                         <button class="btn btn-xs btn-outline-primary btn-block" onclick="hitungRute(${lat}, ${lng}, '${val.name}')">
                             <i class="fas fa-truck"></i> Rute dari Gudang
                         </button>
-                        <a href="<?= site_url('marketing/customers/edit/') ?>${val.customer_id}" class="btn btn-xs btn-default btn-block mt-1">Lihat Detail Lengkap</a>
+                        <a href="<?= site_url('marketing/customers/detail/') ?>${val.customer_id}" class="btn btn-xs btn-default btn-block mt-1">Lihat Detail Lengkap</a>
                     </div>
                 `;
 

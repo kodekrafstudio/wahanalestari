@@ -63,7 +63,7 @@
     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
         
         <li class="nav-item">
-            <a href="<?= site_url('dashboard') ?>" class="nav-link">
+            <a href="<?= site_url('dashboard') ?>" class="nav-link active">
                 <i class="nav-icon fas fa-home"></i>
                 <p>Dashboard</p>
             </a>
@@ -73,7 +73,7 @@
         <li class="nav-header">PENJUALAN (SALES)</li>
         
         <li class="nav-item">
-            <a href="<?= site_url('marketing/sales/create') ?>" class="nav-link active">
+            <a href="<?= site_url('marketing/sales/create') ?>" class="nav-link">
                 <i class="nav-icon fas fa-cash-register"></i>
                 <p>Kasir / Transaksi Baru</p>
             </a>

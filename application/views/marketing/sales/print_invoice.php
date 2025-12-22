@@ -2,79 +2,215 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>INVOICE: <?= $order->invoice_no ?></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INVOICE #<?= $order->invoice_no ?></title>
     <style>
-        /* RESET & BASIC STYLE - Desain Klasik & Bersih */
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; color: #333; margin: 0; padding: 20px; }
-        .container { width: 100%; max-width: 800px; margin: auto; }
+        /* --- VARIABLES & RESET --- */
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #27ae60;
+            --danger-color: #c0392b;
+            --border-color: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            font-size: 12px; /* Font dasar diperkecil */
+            -webkit-print-color-adjust: exact;
+        }
+
+        /* --- CONTAINER (A4 Compact) --- */
+        .invoice-box {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 30px; /* Padding dikurangi */
+            border: 1px solid #ccc;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- HEADER --- */
+        .header-table { width: 100%; margin-bottom: 20px; } /* Margin dikurangi */
+        .brand-name {
+            font-size: 20px; /* Font judul dikurangi */
+            font-weight: 800;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            margin: 0;
+        }
+        .brand-sub { font-size: 11px; color: #777; margin-bottom: 5px; }
+        .company-info { font-size: 11px; color: #555; line-height: 1.3; }
+
+        .invoice-title {
+            font-size: 24px; /* Font invoice dikurangi */
+            font-weight: 900;
+            color: #bdc3c7;
+            text-align: right;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .invoice-meta { text-align: right; font-size: 11px; }
+        .meta-item { margin-bottom: 3px; }
+        .meta-label { font-weight: bold; color: var(--primary-color); margin-right: 5px; }
+
+        /* --- CUSTOMER INFO --- */
+        .info-table { width: 100%; margin-bottom: 25px; border-collapse: collapse; }
+        .info-title {
+            font-size: 10px;
+            font-weight: bold;
+            color: #95a5a6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+        }
+        .info-content { font-size: 11px; line-height: 1.4; }
+        .info-content strong { font-size: 12px; color: #000; }
+
+        /* --- ITEM TABLE --- */
+        .item-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 11px;
+        }
+        .item-table th {
+            background-color: var(--primary-color);
+            color: #fff;
+            font-weight: 600;
+            text-align: left;
+            padding: 8px 10px; /* Padding header diperkecil */
+        }
+        .item-table td {
+            padding: 6px 10px; /* Padding baris diperkecil */
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+        .item-table tr:nth-child(even) { background-color: #f9f9f9; }
+        .item-table tr:last-child td { border-bottom: 2px solid var(--primary-color); }
         
-        table { width: 100%; border-collapse: collapse; }
+        .col-center { text-align: center; }
+        .col-right { text-align: right; }
+
+        /* --- TOTALS --- */
+        .totals-table {
+            width: 40%;
+            float: right;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .totals-table td { padding: 4px 0; }
+        .totals-label { text-align: right; padding-right: 15px; color: #666; }
+        .totals-value { text-align: right; font-weight: 600; color: #333; }
         
-        /* HEADER */
-        .header-brand { font-size: 24px; font-weight: bold; color: #28a745; text-transform: uppercase; margin-bottom: 5px; }
-        .header-subtitle { font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.4; }
+        .grand-total-row td {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            border-top: 1px solid #999;
+            border-bottom: 1px solid #999;
+        }
+        .grand-total-label { font-size: 13px; font-weight: bold; color: var(--primary-color); text-align: right; padding-right: 15px; }
+        .grand-total-value { font-size: 14px; font-weight: bold; color: var(--accent-color); text-align: right; }
+
+        /* --- FOOTER --- */
+        .bottom-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            border-top: 1px dashed #ccc; /* Garis pemisah footer */
+            padding-top: 15px;
+        }
+        .payment-info { width: 60%; font-size: 11px; color: #555; }
+        .bank-list { 
+            display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px; 
+        }
+        .bank-item {
+            background: #f8f9fa; border: 1px solid #ddd; 
+            padding: 5px 8px; border-radius: 4px; font-size: 10px;
+        }
         
-        .invoice-title { font-size: 28px; font-weight: bold; text-align: right; color: #333; letter-spacing: 2px; }
-        .invoice-details { text-align: right; font-size: 14px; margin-top: 5px; }
-        
-        /* INFO BOX */
-        .info-table { margin-top: 30px; margin-bottom: 30px; }
-        .info-label { font-weight: bold; font-size: 12px; color: #777; text-transform: uppercase; letter-spacing: 1px; }
-        .info-content { font-size: 15px; font-weight: 500; line-height: 1.5; margin-top: 5px; }
-        
-        /* ITEM TABLE */
-        .item-table { width: 100%; margin-bottom: 20px; border: 1px solid #ddd; }
-        .item-table th { background-color: #f8f9fa; border-bottom: 2px solid #ddd; padding: 12px; text-align: left; font-weight: bold; color: #444; }
-        .item-table td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: middle; }
-        .item-table tr:last-child td { border-bottom: none; }
-        
-        /* UTILITIES */
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-        .text-bold { font-weight: bold; }
-        .text-danger { color: #dc3545; }
-        
-        /* TOTAL SECTION */
-        .total-table { width: 100%; }
-        .total-table td { padding: 5px 10px; }
-        .grand-total { font-size: 18px; font-weight: bold; background-color: #f8f9fa; color: #28a745; }
-        
-        /* FOOTER & SIGNATURE */
-        .footer-note { font-size: 12px; color: #777; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; }
-        .signature-box { text-align: center; margin-top: 50px; }
-        .sign-line { margin-top: 70px; border-top: 1px solid #333; width: 60%; margin-left: auto; margin-right: auto; }
-        
-        /* PRINT CONTROL */
+        .signature-section { width: 30%; text-align: center; font-size: 11px; }
+        .sign-box { height: 50px; }
+        .sign-name { font-weight: bold; text-decoration: underline; }
+
+        /* --- BADGE --- */
+        .badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+        .badge-paid { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .badge-unpaid { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .badge-partial { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+
+        /* --- PRINT --- */
+        .no-print-bar {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #333; padding: 8px; text-align: center;
+            z-index: 999;
+        }
+        .btn-print {
+            background: var(--accent-color); color: white; border: none;
+            padding: 6px 15px; border-radius: 3px; cursor: pointer; font-size: 12px;
+        }
+        .btn-close {
+            background: #fff; color: #333; border: none;
+            padding: 6px 15px; border-radius: 3px; cursor: pointer; font-size: 12px;
+        }
+
         @media print {
-            .no-print { display: none; }
-            body { padding: 0; }
+            body { background: #fff; padding: 0; margin: 0; }
+            .invoice-box { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+            .no-print-bar { display: none; }
         }
     </style>
 </head>
 <body>
 
-    <div class="no-print" style="text-align: right; padding: 10px; background: #f1f1f1; border-bottom: 1px solid #ccc; margin-bottom: 20px;">
-        <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px;">🖨️ Cetak Invoice</button>
-        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer; border: 1px solid #ccc; background: white; border-radius: 4px;">Tutup</button>
+    <div class="no-print-bar">
+        <button class="btn-print" onclick="window.print()">🖨️ Cetak</button>
+        <button class="btn-close" onclick="window.close()">Tutup</button>
     </div>
 
-    <div class="container">
+    <div class="invoice-box">
         
-        <table>
+        <table class="header-table">
             <tr>
                 <td width="60%" style="vertical-align: top;">
-                    <div class="header-brand">PT. IWL WEBGIS</div>
-                    <div class="header-subtitle">
+                    <div class="brand-name">PT. INSAN WAHANA LESTARI</div>
+                    <div class="brand-sub">Distributor Garam Jogja</div>
+                    <div class="company-info">
                         Jurugentong JG II/17 Gg.Arimbi, Banguntapan, Bantul, DIY<br>
-                        Telp: 0822-2692-2024 | Email: admin@iwl.com
+                        WA: 0822-2692-2024 | Email: insanwahanalestari@gmail.com
                     </div>
                 </td>
                 <td width="40%" style="vertical-align: top;">
                     <div class="invoice-title">INVOICE</div>
-                    <div class="invoice-details">
-                        No: <strong><?= $order->invoice_no ?></strong><br>
-                        Tanggal: <?= date('d M Y', strtotime($order->order_date)) ?><br>
-                        Status: <?= strtoupper($order->status) ?>
+                    <div class="invoice-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">No:</span> <?= $order->invoice_no ?>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Tgl:</span> <?= date('d/m/Y', strtotime($order->order_date)) ?>
+                        </div>
+                        <div class="meta-item" style="margin-top: 5px;">
+                            <?php
+                                $status_badge = 'badge-unpaid';
+                                if($order->payment_status == 'paid') $status_badge = 'badge-paid';
+                                if($order->payment_status == 'partial') $status_badge = 'badge-partial';
+                            ?>
+                            <span class="badge <?= $status_badge ?>">
+                                <?= $order->payment_status == 'paid' ? 'LUNAS' : ($order->payment_status == 'partial' ? 'CICILAN' : 'BELUM LUNAS') ?>
+                            </span>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -83,34 +219,34 @@
         <table class="info-table">
             <tr>
                 <td width="55%" style="vertical-align: top; padding-right: 20px;">
-                    <div class="info-label">TAGIHAN KEPADA:</div>
+                    <div class="info-title">Ditagihkan Kepada:</div>
                     <div class="info-content">
-                        <strong><?= $order->customer_name ?></strong><br>
+                        <strong><?= strtoupper($order->customer_name) ?></strong><br>
                         <?= $order->address ?><br>
                         <?= $order->city ?><br>
                         Telp: <?= $order->phone ?>
                     </div>
                 </td>
                 <td width="45%" style="vertical-align: top;">
-                    <div class="info-label">INFO PENGIRIMAN:</div>
-                    <div class="info-content">
-                        Salesman: <?= $order->salesman_name ?? '-' ?><br>
-                        Admin: <?= $order->creator_name ?><br>
-                        Metode Bayar: <?= $order->payment_status == 'paid' ? 'LUNAS' : ($order->payment_status == 'partial' ? 'CICILAN' : 'BELUM LUNAS') ?>
-                    </div>
+                    <div class="info-title">Detail Order:</div>
+                    <table style="width: 100%; font-size: 11px; color: #444;">
+                        <tr><td width="35%">Salesman</td><td>: <?= $order->salesman_name ?? '-' ?></td></tr>
+                        <tr><td>Admin</td><td>: <?= $order->creator_name ?></td></tr>
+                        <tr><td>Status</td><td>: <?= ucfirst($order->status) ?></td></tr>
+                    </table>
                 </td>
             </tr>
         </table>
 
-        <table class="item-table" cellspacing="0">
+        <table class="item-table">
             <thead>
                 <tr>
-                    <th width="5%" class="text-center">No</th>
-                    <th width="40%">Deskripsi Produk</th>
-                    <th width="10%" class="text-center">Qty</th>
-                    <th width="15%" class="text-right">Harga</th>
-                    <th width="15%" class="text-right">Diskon</th>
-                    <th width="15%" class="text-right">Total</th>
+                    <th width="5%" class="col-center">No</th>
+                    <th width="45%">Produk</th>
+                    <th width="10%" class="col-center">Qty</th>
+                    <th width="15%" class="col-right">Harga</th>
+                    <th width="10%" class="col-right">Disc</th>
+                    <th width="15%" class="col-right">Total</th>
                 </tr>
             </thead>
             <tbody>
@@ -120,100 +256,82 @@
                     foreach($order->items as $item): 
                 ?>
                 <tr>
-                    <td class="text-center"><?= $no++ ?></td>
+                    <td class="col-center"><?= $no++ ?></td>
                     <td>
-                        <strong><?= $item->product_name ?></strong><br>
-                        <small style="color: #666;"><?= $item->unit ?></small>
+                        <strong><?= $item->product_name ?></strong> 
+                        <span style="color:#777; font-size:10px;">(<?= $item->unit ?>)</span>
                     </td>
-                    <td class="text-center"><?= $item->qty ?></td>
-                    <td class="text-right">Rp <?= number_format($item->price, 0, ',', '.') ?></td>
-                    <td class="text-right text-danger"><?= $item->discount > 0 ? number_format($item->discount, 0, ',', '.') : '-' ?></td>
-                    <td class="text-right text-bold">Rp <?= number_format($item->subtotal, 0, ',', '.') ?></td>
+                    <td class="col-center"><?= ((float)$item->qty) ?></td>
+                    <td class="col-right">Rp <?= number_format($item->price, 0, ',', '.') ?></td>
+                    <td class="col-right text-danger"><?= $item->discount > 0 ? number_format($item->discount, 0, ',', '.') : '-' ?></td>
+                    <td class="col-right"><strong><?= number_format($item->subtotal, 0, ',', '.') ?></strong></td>
                 </tr>
                 <?php endforeach; endif; ?>
                 
-                <?php for($x=0; $x<(5 - count($order->items)); $x++): ?>
-                <tr><td colspan="6" style="padding: 15px;">&nbsp;</td></tr>
-                <?php endfor; ?>
+                <?php if(count($order->items) < 3): ?>
+                    <tr><td colspan="6" style="padding: 15px;"></td></tr>
+                <?php endif; ?>
             </tbody>
         </table>
 
-        <table>
-            <tr>
-                <td width="60%" style="vertical-align: top; padding-right: 30px;">
-                    <div class="info-label">METODE PEMBAYARAN:</div>
-                    <div style="margin-top: 5px; font-size: 13px; line-height: 1.6; color: #555;">
-                        Silakan transfer pembayaran ke:<br>
-                        <strong>Bank BCA: 123-456-7890</strong> (a.n PT IWL WEBGIS)<br>
-                        <strong>Bank Mandiri: 987-654-3210</strong> (a.n PT IWL WEBGIS)<br>
-                        <em>Mohon sertakan No. Invoice pada berita transfer.</em>
-                    </div>
-                </td>
-                <td width="40%" style="vertical-align: top;">
-                    <table class="total-table">
-                        <tr>
-                            <td>Subtotal</td>
-                            <td class="text-right">Rp <?= number_format($order->total_amount, 0, ',', '.') ?></td>
-                        </tr>
-                        <?php if($order->shipping_cost > 0): ?>
-                        <tr>
-                            <td>Ongkir (+)</td>
-                            <td class="text-right">Rp <?= number_format($order->shipping_cost, 0, ',', '.') ?></td>
-                        </tr>
-                        <?php endif; ?>
-                        <?php if($order->other_discount > 0): ?>
-                        <tr>
-                            <td>Potongan Lain (-)</td>
-                            <td class="text-right text-danger">Rp <?= number_format($order->other_discount, 0, ',', '.') ?></td>
-                        </tr>
-                        <?php endif; ?>
-                        
-                        <?php 
-                             $grand = ($order->grand_total > 0) ? $order->grand_total : $order->total_amount;
-                        ?>
-                        <tr>
-                            <td class="grand-total" style="border-top: 2px solid #ccc; padding-top: 10px;">TOTAL TAGIHAN</td>
-                            <td class="text-right grand-total" style="border-top: 2px solid #ccc; padding-top: 10px;">
-                                Rp <?= number_format($grand, 0, ',', '.') ?>
-                            </td>
-                        </tr>
-                        
-                        <tr>
-                            <td style="padding-top: 10px;">Sudah Dibayar</td>
-                            <td class="text-right text-success" style="padding-top: 10px;">(-) Rp <?= number_format($order->total_paid, 0, ',', '.') ?></td>
-                        </tr>
-                        <tr>
-                            <td class="text-bold text-danger">SISA</td>
-                            <td class="text-right text-bold text-danger">Rp <?= number_format($grand - $order->total_paid, 0, ',', '.') ?></td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
+        <div style="overflow: hidden;">
+            <table class="totals-table">
+                <tr>
+                    <td class="totals-label">Subtotal</td>
+                    <td class="totals-value">Rp <?= number_format($order->total_amount, 0, ',', '.') ?></td>
+                </tr>
+                <?php if($order->shipping_cost > 0): ?>
+                <tr>
+                    <td class="totals-label">Ongkir</td>
+                    <td class="totals-value">Rp <?= number_format($order->shipping_cost, 0, ',', '.') ?></td>
+                </tr>
+                <?php endif; ?>
+                <?php if($order->other_discount > 0): ?>
+                <tr>
+                    <td class="totals-label text-danger">Potongan</td>
+                    <td class="totals-value text-danger">- Rp <?= number_format($order->other_discount, 0, ',', '.') ?></td>
+                </tr>
+                <?php endif; ?>
+                
+                <?php $grand = ($order->grand_total > 0) ? $order->grand_total : $order->total_amount; ?>
+                
+                <tr class="grand-total-row">
+                    <td class="grand-total-label">TOTAL</td>
+                    <td class="grand-total-value">Rp <?= number_format($grand, 0, ',', '.') ?></td>
+                </tr>
 
-        <table style="margin-top: 50px;">
-            <tr>
-                <td width="33%" class="signature-box">
-                    Penerima,<br><br><br><br>
-                    <div class="sign-line"></div>
-                </td>
-                <td width="33%"></td>
-                <td width="33%" class="signature-box">
-                    Hormat Kami,<br><br><br><br>
-                    <div class="sign-line"></div>
-                    <strong>Admin Finance</strong>
-                </td>
-            </tr>
-        </table>
+                <tr>
+                    <td class="totals-label" style="padding-top: 5px;">Bayar</td>
+                    <td class="totals-value" style="color: var(--accent-color); padding-top: 5px;">Rp <?= number_format($order->total_paid, 0, ',', '.') ?></td>
+                </tr>
+                <tr>
+                    <td class="totals-label" style="font-weight: bold;">SISA</td>
+                    <td class="totals-value" style="color: var(--danger-color);">Rp <?= number_format($grand - $order->total_paid, 0, ',', '.') ?></td>
+                </tr>
+            </table>
+        </div>
 
-        <div class="footer-note center">
-            Terima kasih atas kepercayaan Anda berbisnis dengan kami.
+        <div class="bottom-section">
+            <div class="payment-info">
+                <strong>METODE PEMBAYARAN:</strong>
+                <div style="margin-top: 5px; font-size: 10px; line-height: 1.6; color: #555;">
+                    Silakan transfer pembayaran ke:<br>
+                    <strong>Bank BPD DIY : 006211031536</strong> (a.n Indri Septiani)<br>
+                    <strong>Bank BCA : 8465957715</strong> (a.n Ahmad Asrori)<br>
+                    <strong>Bank BRI : 300801000004566</strong> (a.n PT INSAN WAHANA LESTARI)<br>
+                    <em>Mohon sertakan No. Invoice pada berita transfer.</em>
+                </div>
+            </div>
+
+            <div class="signature-section">
+                <div>Yogyakarta, <?= date('d M Y') ?></div>
+                <div style="margin-bottom: 2px;">Hormat Kami,</div>
+                <div class="sign-box"></div>
+                <div class="sign-name">Admin Finance</div>
+            </div>
         </div>
 
     </div>
 
-    <script>
-        window.onload = function() { window.print(); }
-    </script>
 </body>
 </html>
